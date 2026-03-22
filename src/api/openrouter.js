@@ -1,6 +1,6 @@
 const OPENROUTER_API_URL = import.meta.env.DEV
   ? '/openrouter/api/v1/chat/completions'
-  : 'https://openrouter.ai/api/v1/chat/completions'
+  : '/api/translate'
 
 const DIFFICULTY_PROMPT = {
   '초등학생': '초등학생도 이해할 수 있도록 매우 쉬운 일상 언어와 비유로 설명해주세요. 복잡한 단어는 피해주세요.',
@@ -9,17 +9,10 @@ const DIFFICULTY_PROMPT = {
 }
 
 export async function translateCode(code, difficulty) {
-  const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY
-  if (!apiKey) throw new Error('API 키가 설정되지 않았습니다.')
-
-  console.log('요청 URL:', OPENROUTER_API_URL)
-
-  const body = JSON.stringify({
-    model: 'openai/gpt-4o-mini',
-    messages: [
-      {
-        role: 'system',
-        content: `당신은 코드를 비전공자도 이해할 수 있는 언어로 번역해주는 "코드 번역기"입니다.
+  const messages = [
+    {
+      role: 'system',
+      content: `당신은 코드를 비전공자도 이해할 수 있는 언어로 번역해주는 "코드 번역기"입니다.
 프로그래밍 언어를 자동으로 감지하고, 모든 설명은 한국어로 작성하세요.
 ${DIFFICULTY_PROMPT[difficulty]}
 
@@ -31,25 +24,30 @@ ${DIFFICULTY_PROMPT[difficulty]}
   "key_concepts": ["핵심개념1", "핵심개념2", "핵심개념3"],
   "difficulty": "${difficulty}"
 }`,
-      },
-      {
-        role: 'user',
-        content: `다음 코드를 번역해주세요:\n\n\`\`\`\n${code}\n\`\`\``,
-      },
-    ],
-  })
+    },
+    {
+      role: 'user',
+      content: `다음 코드를 번역해주세요:\n\n\`\`\`\n${code}\n\`\`\``,
+    },
+  ]
+
+  const isdev = import.meta.env.DEV
+  const headers = { 'Content-Type': 'application/json' }
+  if (isdev) {
+    headers['Authorization'] = `Bearer ${import.meta.env.VITE_OPENROUTER_API_KEY}`
+  }
+
+  const body = isdev
+    ? JSON.stringify({ model: 'openai/gpt-4o-mini', messages })
+    : JSON.stringify({ messages })
 
   const response = await fetch(OPENROUTER_API_URL, {
     method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
+    headers,
     body,
   })
 
   const data = await response.json()
-  console.log('OpenRouter 응답:', JSON.stringify(data))
 
   if (!response.ok) {
     throw new Error(data.error?.message || `API 오류: ${response.status}`)
